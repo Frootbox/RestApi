@@ -1,0 +1,21 @@
+{
+    "name": "frootbox/rest-api",
+    "description": "Frootbox REST API Framework",
+    "support": {
+        "docs": "",
+        "email": "jan.habbo.bruening@gmail.com"
+    },
+    "authors": [
+        {
+            "name": "Jan Habbo Brüning",
+            "email": "jan.habbo.bruening@gmail.com"
+        }
+    ],
+    "license": "GPL-3.0-or-later",
+    "require": {
+        "php": ">=8.0.0"
+    },
+    "autoload": {
+    	"psr-4": { "Frootbox\\RestApi\\": "src/" }
+    }
+}
