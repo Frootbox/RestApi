@@ -15,7 +15,24 @@ class Payload
     public function __construct()
     {
         $this->queryParameters = $_GET;
-        $this->bodyParameters = $_POST;
+
+        // Parse request body
+        $requestBody = trim(file_get_contents('php://input'));
+
+        if (!empty($requestBody)) {
+
+            // Validate json
+            if (!\json_validate($requestBody)) {
+                throw new \Frootbox\RestApi\Exception\InvalidInput("Body payload contains invalid JSON.");
+            }
+
+            // Parse request body
+            $requestBody = json_decode($requestBody, true);
+
+            if (!empty($requestBody)) {
+                $this->bodyParameters = $requestBody;
+            }
+        }
     }
 
     public function getBodyParameter(string $parameter): ?string

@@ -10,7 +10,7 @@ class Server
     protected array $routes = [];
 
     public function __construct(
-        protected Interfaces\ClientRepositoryInterface $clientRepository,
+        protected Interface\ClientRepositoryInterface $clientRepository,
         protected string $baseUriRegex,
         protected string $controllerDirectory,
         protected string $namespace,
@@ -54,11 +54,11 @@ class Server
                 $attributes = $method->getAttributes();
 
                 // Get auth
-                $auth = \Frootbox\RestApi\Attributes\Bearer::class;
+                $auth = \Frootbox\RestApi\Attribute\Bearer::class;
 
                 foreach ($attributes as $attribute) {
 
-                    if ($attribute->getName() == 'Frootbox\RestApi\Attributes\Auth') {
+                    if ($attribute->getName() == 'Frootbox\RestApi\Attribute\Auth') {
                         $auth = get_class($attribute->getArguments()['type']);
                     }
                 }
@@ -148,7 +148,11 @@ class Server
                 throw new \Exception('Auth method missing.');
             }
 
-            if ($route['auth'] == \Frootbox\RestApi\Attributes\Bearer::class) {
+            if ($route['auth'] == \Frootbox\RestApi\Attribute\Bearer::class) {
+
+                if (empty($_SERVER['HTTP_AUTHORIZATION'])) {
+                    throw new \Exception('Bearer token is missing.');
+                }
 
                 $jwt = substr($_SERVER['HTTP_AUTHORIZATION'], 7);
                 $decoded = \Firebase\JWT\JWT::decode($jwt, new \Firebase\JWT\Key($this->hashKey, 'HS256'));
@@ -159,7 +163,15 @@ class Server
                     call_user_func($this->onDecodeToken, $token);
                 }
             }
-            elseif ($route['auth'] == \Frootbox\RestApi\Attributes\Client::class) {
+            elseif ($route['auth'] == \Frootbox\RestApi\Attribute\Client::class) {
+
+                if (empty($_GET['client_id'])) {
+                    throw new \Exception('Client ID missing.');
+                }
+
+                if (empty($_GET['client_secret'])) {
+                    throw new \Exception('Client secret missing.');
+                }
 
                 // Validate client
                 $this->clientRepository->validate(
@@ -179,9 +191,17 @@ class Server
             header('Content-Type: application/json; charset=utf-8');
             die($response->tojson());
         }
+        catch (\Frootbox\RestApi\Exception\AbstractException $exception) {
+
+            http_response_code($exception->getHttpStatusCode());
+
+            die(!empty($exception->getMessage()) ? $exception->getMessage() : 'Unknown Error: ' . get_class($exception));
+        }
         catch (\Exception $exception) {
+
             http_response_code(500);
-            die($exception->getMessage());
+            
+            die(!empty($exception->getMessage()) ? $exception->getMessage() : 'Unknown Error: ' . get_class($exception));
         }
     }
 }

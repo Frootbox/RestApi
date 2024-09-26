@@ -1,9 +1,9 @@
 <?php
 /**
- *
+ * @author Jan Habbo Brüning <jan.habbo.bruening@gmail.com>
  */
 
-namespace Frootbox\RestApi\Interfaces;
+namespace Frootbox\RestApi\Interface;
 
 interface ClientRepositoryInterface
 {
