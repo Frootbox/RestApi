@@ -3,7 +3,7 @@
  * @author Jan Habbo Brüning <jan.habbo.bruening@gmail.com>
  */
 
-namespace FrootBox\RestApi\Attribute;
+namespace Frootbox\RestApi\Attribute;
 
 #[\Attribute]
 class Bearer {
