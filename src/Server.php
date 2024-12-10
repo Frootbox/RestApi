@@ -74,9 +74,17 @@ class Server
 
                     // Generate regex
                     $regex = $route;
-                    $regex = '#^' . preg_replace_callback('#{(.*?)}#', function($data) {
-                        return '(?P<' . $data[1] . '>[^\/]*)';
-                    }, $regex) . '$#i';
+                    $regex = '#^' . preg_replace_callback('#{int:(.*?)}#', function($data) {
+                        return '(?P<' . $data[1] . '>[0-9]+)';
+                    }, $regex, -1, $count) . '$#i';
+
+                    if ($count == 0) {
+
+                        $regex = $route;
+                        $regex = '#^' . preg_replace_callback('#{(.*?)}#', function($data) {
+                            return '(?P<' . $data[1] . '>[^\/]*)';
+                        }, $regex) . '$#i';
+                    }
 
                     // Extract http-method
                     $httpMethod = str_replace('OpenApi\\Attributes\\', '', $attribute->getName());
