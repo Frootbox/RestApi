@@ -54,13 +54,17 @@ class Server
                 $attributes = $method->getAttributes();
 
                 // Get auth
-                $auth = \Frootbox\RestApi\Attribute\Bearer::class;
+                $auths = [];
 
                 foreach ($attributes as $attribute) {
 
                     if ($attribute->getName() == 'Frootbox\RestApi\Attribute\Auth') {
-                        $auth = get_class($attribute->getArguments()['type']);
+                        $auths[] = get_class($attribute->getArguments()['type']);
                     }
+                }
+
+                if (empty($auths)) {
+                    $auths[] = \Frootbox\RestApi\Attribute\Bearer::class;
                 }
 
                 foreach ($attributes as $attribute) {
@@ -97,7 +101,7 @@ class Server
                         'httpMethod' => $httpMethod,
                         'method' => $method->getName(),
                         'class' => $controllerClass,
-                        'auth' => $auth,
+                        'auths' => $auths,
                     ];
                 }
             }
@@ -152,43 +156,67 @@ class Server
                 throw new \Exception('Route does not exist');
             }
 
-            if (empty($route['auth'])) {
+            if (empty($route['auths'])) {
                 throw new \Exception('Auth method missing.');
             }
 
-            if ($route['auth'] == \Frootbox\RestApi\Attribute\Bearer::class) {
+            $authed = false;
+            $authError = null;
 
-                if (empty($_SERVER['HTTP_AUTHORIZATION'])) {
-                    throw new \Exception('Bearer token is missing.');
+            foreach ($route['auths'] as $auth) {
+
+                try {
+
+                    if ($auth == \Frootbox\RestApi\Attribute\Bearer::class) {
+
+                        if (empty($_SERVER['HTTP_AUTHORIZATION'])) {
+                            throw new \Exception('Bearer token is missing.');
+                        }
+
+                        $jwt = substr($_SERVER['HTTP_AUTHORIZATION'], 7);
+                        $decoded = \Firebase\JWT\JWT::decode($jwt, new \Firebase\JWT\Key($this->hashKey, 'HS256'));
+
+                        $token = new \Frootbox\RestApi\Token(payload: json_decode(json_encode($decoded), true));
+
+                        if (is_callable($this->onDecodeToken)) {
+                            call_user_func($this->onDecodeToken, $token);
+                        }
+
+                        $authed = true;
+                    }
+                    elseif ($auth == \Frootbox\RestApi\Attribute\Client::class) {
+
+                        if (empty($_GET['client_id'])) {
+                            throw new \Exception('Client ID missing.');
+                        }
+
+                        if (empty($_GET['client_secret'])) {
+                            throw new \Exception('Client secret missing.');
+                        }
+
+                        // Validate client
+                        $this->clientRepository->validate(
+                            clientId: $_GET['client_id'],
+                            clientSecret: $_GET['client_secret'],
+                        );
+
+                        $authed = true;
+                    }
+                    else {
+                        throw new \Exception('Unknown auth: ' . $route['auth']);
+                    }
+
+                    if ($authed) {
+                        break;
+                    }
                 }
-
-                $jwt = substr($_SERVER['HTTP_AUTHORIZATION'], 7);
-                $decoded = \Firebase\JWT\JWT::decode($jwt, new \Firebase\JWT\Key($this->hashKey, 'HS256'));
-
-                $token = new \Frootbox\RestApi\Token(payload: json_decode(json_encode($decoded), true));
-
-                if (is_callable($this->onDecodeToken)) {
-                    call_user_func($this->onDecodeToken, $token);
+                catch (\Exception $e) {
+                    $authError = $e->getMessage();
                 }
             }
-            elseif ($route['auth'] == \Frootbox\RestApi\Attribute\Client::class) {
 
-                if (empty($_GET['client_id'])) {
-                    throw new \Exception('Client ID missing.');
-                }
-
-                if (empty($_GET['client_secret'])) {
-                    throw new \Exception('Client secret missing.');
-                }
-
-                // Validate client
-                $this->clientRepository->validate(
-                    clientId: $_GET['client_id'],
-                    clientSecret: $_GET['client_secret'],
-                );
-            }
-            else {
-                throw new \Exception('Unknown auth: ' . $route['auth']);
+            if (!$authed) {
+                throw new \Exception($authError);
             }
 
             // Get controller and method
