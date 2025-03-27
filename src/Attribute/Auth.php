@@ -9,7 +9,7 @@ namespace FrootBox\RestApi\Attribute;
 class Auth {
     
     public function __construct(
-        Client|Bearer $type,    
+        Client|Bearer|BasicAuth $type,
     )
     { }    
 }

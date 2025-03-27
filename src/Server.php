@@ -17,6 +17,7 @@ class Server
         protected \DI\Container $container,
         protected string $hashKey,
         protected $onDecodeToken = null,
+        protected $onValidateClient = null,
     )
     {
         $routes = [
@@ -167,7 +168,25 @@ class Server
 
                 try {
 
-                    if ($auth == \Frootbox\RestApi\Attribute\Bearer::class) {
+                    if ($auth == \Frootbox\RestApi\Attribute\BasicAuth::class) {
+
+                        if (empty($_SERVER['PHP_AUTH_USER']) or empty($_SERVER['PHP_AUTH_PW'])) {
+                            throw new \Exception('Auth information missing.');
+                        }
+
+                        // Validate client
+                        $this->clientRepository->validate(
+                            clientId: $_SERVER['PHP_AUTH_USER'],
+                            clientSecret: $_SERVER['PHP_AUTH_PW'],
+                        );
+
+                        if (is_callable($this->onValidateClient)) {
+                            call_user_func($this->onValidateClient, $_SERVER['PHP_AUTH_USER']);
+                        }
+
+                        $authed = true;
+                    }
+                    elseif ($auth == \Frootbox\RestApi\Attribute\Bearer::class) {
 
                         if (empty($_SERVER['HTTP_AUTHORIZATION'])) {
                             throw new \Exception('Bearer token is missing.');
@@ -200,10 +219,14 @@ class Server
                             clientSecret: $_GET['client_secret'],
                         );
 
+                        if (is_callable($this->onValidateClient)) {
+                            call_user_func($this->onValidateClient, $_GET['client_id']);
+                        }
+                        
                         $authed = true;
                     }
                     else {
-                        throw new \Exception('Unknown auth: ' . $route['auth']);
+                        throw new \Exception('Unknown auth: ' . $auth);
                     }
 
                     if ($authed) {
