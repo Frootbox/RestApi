@@ -35,12 +35,20 @@ class Payload
         }
     }
 
-    public function getBodyParameter(string $parameter): ?string
+    /**
+     * @param string $parameter
+     * @return int|string|array|null
+     */
+    public function getBodyParameter(string $parameter): int|string|array|null
     {
         return $this->bodyParameters[$parameter] ?? null;
     }
 
-    public function getQueryParameter(string $parameter): ?string
+    /**
+     * @param string $parameter
+     * @return int|string|null
+     */
+    public function getQueryParameter(string $parameter): int|string|null
     {
         return $this->queryParameters[$parameter] ?? null;
     }
