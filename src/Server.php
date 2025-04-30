@@ -188,7 +188,7 @@ class Server
                     }
                     elseif ($auth == \Frootbox\RestApi\Attribute\Bearer::class) {
 
-                        if (empty($_SERVER['HTTP_AUTHORIZATION'])) {
+                        if (empty($_SERVER['HTTP_AUTHORIZATION']) or !str_starts_with($_SERVER['HTTP_AUTHORIZATION'], 'Bearer ')) {
                             throw new \Exception('Bearer token is missing.');
                         }
 
@@ -205,24 +205,37 @@ class Server
                     }
                     elseif ($auth == \Frootbox\RestApi\Attribute\Client::class) {
 
-                        if (empty($_GET['client_id'])) {
-                            throw new \Exception('Client ID missing.');
+                        if (!empty($_SERVER['PHP_AUTH_USER'])) {
+                            $clientId = $_SERVER['PHP_AUTH_USER'];
                         }
 
-                        if (empty($_GET['client_secret'])) {
+                        if (!empty($_SERVER['PHP_AUTH_PW'])) {
+                            $clientSecret = $_SERVER['PHP_AUTH_PW'];
+                        }
+
+                        if (!empty($_GET['client_id'])) {
+                            $clientId = $_GET['client_id'];
+                        }
+
+                        if (!empty($_GET['client_secret'])) {
+                            $clientSecret = $_GET['client_secret'];
+                        }
+
+                        if (empty($clientSecret)) {
                             throw new \Exception('Client secret missing.');
+                        }
+
+                        if (empty($clientId)) {
+                            throw new \Exception('Client ID missing.');
                         }
 
                         // Validate client
                         $this->clientRepository->validate(
-                            clientId: $_GET['client_id'],
-                            clientSecret: $_GET['client_secret'],
+                            clientId: $clientId,
+                            clientSecret: $clientSecret,
+                            onValidateClient: $this->onValidateClient,
                         );
 
-                        if (is_callable($this->onValidateClient)) {
-                            call_user_func($this->onValidateClient, $_GET['client_id']);
-                        }
-                        
                         $authed = true;
                     }
                     else {
