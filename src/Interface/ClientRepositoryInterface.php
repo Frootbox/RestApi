@@ -12,5 +12,5 @@ interface ClientRepositoryInterface
      * @param string $clientSecret
      * @return mixed
      */
-    public function validate(string $clientId, string $clientSecret): void;
+    public function validate(string $clientId, string $clientSecret, callable $onValidateClient = null): void;
 }
