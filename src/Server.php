@@ -1,7 +1,12 @@
 <?php
 /**
+ * @author Jan Habbo Brüning <jan.habbo.bruening@gmail.com>
  *
+ * @noinspection PhpUnnecessaryLocalVariableInspection
+ * @noinspection PhpFullyQualifiedNameUsageInspection
  */
+
+declare(strict_types=1);
 
 namespace Frootbox\RestApi;
 
@@ -43,7 +48,10 @@ class Server
             $reflection = new \ReflectionClass($controllerClass);
 
             // Extract version
-            preg_match('#\\\\V([0-9]+)\\\\#', $reflection->getName(), $match);
+            if (!preg_match('#\\\\V([0-9]+)\\\\#', $reflection->getName(), $match)) {
+                continue;
+            }
+
             $version = (int) $match[1];
 
             foreach ($reflection->getMethods(\ReflectionMethod::IS_PUBLIC) as $method) {
@@ -141,7 +149,7 @@ class Server
 
                 foreach ($matches as $key => $value) {
 
-                    if (preg_match('#^[0-9]+$#', $key)) {
+                    if (preg_match('#^[0-9]+$#', (string) $key)) {
                         continue;
                     }
 
