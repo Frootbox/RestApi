@@ -6,10 +6,10 @@
  * @noinspection PhpFullyQualifiedNameUsageInspection
  */
 
-namespace Frootbox\RestApi\Attribute;
+namespace Frootbox\RestApi\Exception;
 
-#[\Attribute(\Attribute::IS_REPEATABLE | \Attribute::TARGET_METHOD)]
-class Bearer
+class NotAuthed extends AbstractException
 {
-   
+    protected int $httpStatusCode = 401;
+    protected $message = "Not authed";
 }

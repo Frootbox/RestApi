@@ -1,6 +1,9 @@
 <?php
 /**
  * @author Jan Habbo Brüning <jan.habbo.bruening@gmail.com>
+ *
+ * @noinspection PhpUnnecessaryLocalVariableInspection
+ * @noinspection PhpFullyQualifiedNameUsageInspection
  */
 
 namespace Frootbox\RestApi\Interface;
@@ -10,7 +13,8 @@ interface ClientRepositoryInterface
     /**
      * @param string $clientId
      * @param string $clientSecret
-     * @return mixed
+     * @param callable|null $onValidateClient
+     * @return void
      */
     public function validate(string $clientId, string $clientSecret, callable $onValidateClient = null): void;
 

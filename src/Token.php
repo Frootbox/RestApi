@@ -1,6 +1,9 @@
 <?php
 /**
- * @author Ja
+ * @author Jan Habbo Brüning <jan.habbo.bruening@gmail.com>
+ *
+ * @noinspection PhpUnnecessaryLocalVariableInspection
+ * @noinspection PhpFullyQualifiedNameUsageInspection
  */
 
 namespace Frootbox\RestApi;
@@ -8,10 +11,10 @@ namespace Frootbox\RestApi;
 class Token
 {
     /**
-     * @param $payload
+     * @param array $payload
      */
     public function __construct(
-        protected $payload = [],
+        protected array $payload = [],
     )
     { }
 

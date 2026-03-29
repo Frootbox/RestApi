@@ -1,6 +1,9 @@
 <?php
 /**
+ * @author Jan Habbo Brüning <jan.habbo.bruening@gmail.com>
  *
+ * @noinspection PhpUnnecessaryLocalVariableInspection
+ * @noinspection PhpFullyQualifiedNameUsageInspection
  */
 
 declare(strict_types=1);

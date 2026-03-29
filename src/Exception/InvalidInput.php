@@ -1,6 +1,9 @@
 <?php
 /**
- * 
+ * @author Jan Habbo Brüning <jan.habbo.bruening@gmail.com>
+ *
+ * @noinspection PhpUnnecessaryLocalVariableInspection
+ * @noinspection PhpFullyQualifiedNameUsageInspection
  */
 
 namespace Frootbox\RestApi\Exception;
@@ -8,6 +11,6 @@ namespace Frootbox\RestApi\Exception;
 class InvalidInput extends AbstractException
 {
     protected int $httpStatusCode = 400;
-    protected $message = "KJklklj";
+    protected $message = "Invalid input";
     
 }

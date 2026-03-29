@@ -95,7 +95,7 @@ class Server
 
                         $regex = $route;
                         $regex = '#^' . preg_replace_callback('#{(.*?)}#', function($data) {
-                            return '(?P<' . $data[1] . '>[^\/]*)';
+                            return '(?P<' . $data[1] . '>[^\/]+)';
                         }, $regex) . '$#i';
                     }
 
@@ -128,7 +128,10 @@ class Server
         try {
 
             $request = explode('?', $_SERVER['REQUEST_URI'])[0];
-            preg_match($this->baseUriRegex, $request, $match);
+
+            if (!preg_match($this->baseUriRegex, $request, $match)) {
+                throw new \Exception('Invalid request URI.');
+            }
 
             $requestedVersion = $match['Version'];
             $requestedPath = $match['Path'];
@@ -178,7 +181,11 @@ class Server
 
                     if ($auth == \Frootbox\RestApi\Attribute\BasicAuth::class) {
 
-                        if (empty($_SERVER['PHP_AUTH_USER']) or empty($_SERVER['PHP_AUTH_PW'])) {
+                        if (empty($_SERVER['PHP_AUTH_USER']) && empty($_SERVER['PHP_AUTH_PW'])) {
+                            continue;
+                        }
+
+                        if (empty($_SERVER['PHP_AUTH_USER']) || empty($_SERVER['PHP_AUTH_PW'])) {
                             throw new \Exception('Auth information missing.');
                         }
 
@@ -197,7 +204,7 @@ class Server
                     elseif ($auth == \Frootbox\RestApi\Attribute\Bearer::class) {
 
                         if (empty($_SERVER['HTTP_AUTHORIZATION']) or !str_starts_with($_SERVER['HTTP_AUTHORIZATION'], 'Bearer ')) {
-                            throw new \Exception('Bearer token is missing.');
+                            continue;
                         }
 
                         $jwt = substr($_SERVER['HTTP_AUTHORIZATION'], 7);
@@ -213,6 +220,9 @@ class Server
                     }
                     elseif ($auth == \Frootbox\RestApi\Attribute\Client::class) {
 
+                        $clientId = null;
+                        $clientSecret = null;
+
                         if (!empty($_SERVER['PHP_AUTH_USER'])) {
                             $clientId = $_SERVER['PHP_AUTH_USER'];
                         }
@@ -227,6 +237,10 @@ class Server
 
                         if (!empty($_GET['client_secret'])) {
                             $clientSecret = $_GET['client_secret'];
+                        }
+
+                        if (empty($clientSecret) && empty($clientId)) {
+                            continue;
                         }
 
                         if (empty($clientSecret)) {
@@ -248,34 +262,45 @@ class Server
                     }
                     elseif ($auth == \Frootbox\RestApi\Attribute\ApiKey::class) {
 
+                        // Obtain api key
+                        $headers = function_exists('getallheaders') ? getallheaders() : [];
+                        $apiKey = $headers['x-api-key']
+                            ?? $headers['X-API-Key']
+                            ?? $_SERVER['HTTP_X_API_KEY']
+                            ?? null;
+
+                        if (empty($apiKey)) {
+                            continue;
+                        }
+
+                        // Validate api key
                         $this->clientRepository->validateApiKey(
-                            apiKey: $_SERVER['HTTP_X_API_KEY'],
+                            apiKey: $apiKey,
                             onValidateClient: $this->onValidateClient,
                         );
 
                         $authed = true;
                     }
                     else {
-                        throw new \Exception('Unknown auth: ' . $auth);
+                        throw new \Frootbox\RestApi\Exception\NotAuthed('Unknown auth: ' . $auth);
                     }
 
-                    if ($authed) {
-                        break;
-                    }
+                    break;
                 }
-                catch (\Exception $e) {
+                catch (\Throwable $e) {
                     $authError = $e->getMessage();
                 }
             }
 
             if (!$authed) {
-                throw new \Exception($authError);
+                throw new \Frootbox\RestApi\Exception\NotAuthed($authError ?? 'Not authed.');
             }
 
-            // Get controller and method
-            $controller = new $routeData['class'];
+            // Get controller
+            $controller = $this->container->get($route['class']);
 
-            $response = $this->container->call([ $controller, $routeData['method'] ]);
+            // Perform controller action
+            $response = $this->container->call([ $controller, $route['method'] ]);
 
             header('Content-Type: application/json; charset=utf-8');
             die($response->tojson());
@@ -286,7 +311,7 @@ class Server
 
             die(!empty($exception->getMessage()) ? $exception->getMessage() : 'Unknown Error: ' . get_class($exception));
         }
-        catch (\Exception $exception) {
+        catch (\Throwable $exception) {
 
             http_response_code(500);
             
