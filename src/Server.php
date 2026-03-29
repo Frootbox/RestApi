@@ -246,6 +246,15 @@ class Server
 
                         $authed = true;
                     }
+                    elseif ($auth == \Frootbox\RestApi\Attribute\ApiKey::class) {
+
+                        $this->clientRepository->validateApiKey(
+                            apiKey: $_SERVER['HTTP_X_API_KEY'],
+                            onValidateClient: $this->onValidateClient,
+                        );
+
+                        $authed = true;
+                    }
                     else {
                         throw new \Exception('Unknown auth: ' . $auth);
                     }

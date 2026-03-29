@@ -13,4 +13,11 @@ interface ClientRepositoryInterface
      * @return mixed
      */
     public function validate(string $clientId, string $clientSecret, callable $onValidateClient = null): void;
+
+    /**
+     * @param string $apiKey
+     * @param callable|null $onValidateClient
+     * @return void
+     */
+    public function validateApiKey(string $apiKey, callable $onValidateClient = null): void;
 }

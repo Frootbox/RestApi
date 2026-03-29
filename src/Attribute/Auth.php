@@ -5,11 +5,11 @@
 
 namespace FrootBox\RestApi\Attribute;
 
-#[\Attribute]
-class Auth {
-    
+#[\Attribute(\Attribute::TARGET_METHOD | \Attribute::IS_REPEATABLE)]
+class Auth
+{
     public function __construct(
-        Client|Bearer|BasicAuth $type,
+        Client|Bearer|BasicAuth|ApiKey $type,
     )
     { }    
 }

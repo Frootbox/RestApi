@@ -6,6 +6,7 @@
 namespace Frootbox\RestApi\Attribute;
 
 #[\Attribute(\Attribute::IS_REPEATABLE | \Attribute::TARGET_METHOD)]
-class BasicAuth {
+class BasicAuth
+{
 
 }
