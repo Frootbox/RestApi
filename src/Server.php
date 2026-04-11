@@ -218,6 +218,9 @@ class Server
 
                         $authed = true;
                     }
+                    elseif ($auth == \Frootbox\RestApi\Attribute\None::class) {
+                        $authed = true;
+                    }
                     elseif ($auth == \Frootbox\RestApi\Attribute\Client::class) {
 
                         $clientId = null;
