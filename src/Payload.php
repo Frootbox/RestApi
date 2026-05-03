@@ -42,7 +42,7 @@ class Payload
      * @param string $parameter
      * @return int|string|array|null
      */
-    public function getBodyParameter(string $parameter): int|string|array|null
+    public function getBodyParameter(string $parameter): int|float|string|array|bool|null
     {
         return $this->bodyParameters[$parameter] ?? null;
     }
@@ -51,8 +51,26 @@ class Payload
      * @param string $parameter
      * @return int|string|null
      */
-    public function getQueryParameter(string $parameter): int|string|null
+    public function getQueryParameter(string $parameter): int|float|string|null
     {
         return $this->queryParameters[$parameter] ?? null;
+    }
+
+    /**
+     * @param string $parameter
+     * @return bool
+     */
+    public function hasBodyParameter(string $parameter): bool
+    {
+        return isset($this->bodyParameters[$parameter]);
+    }
+
+    /**
+     * @param string $parameter
+     * @return bool
+     */
+    public function hasQueryParameter(string $parameter): bool
+    {
+        return isset($this->queryParameters[$parameter]);
     }
 }
