@@ -201,6 +201,26 @@ namespace App\\Controller\\V1;
 /users/{slug}
 ~~~
 
+### ULID parameter
+
+~~~markdown
+/users/{ulid:id}
+~~~
+
+### OpenAPI parameter pattern
+
+~~~php
+#[OA\Get(path: '/users/{id}')]
+#[OA\Parameter(
+    name: 'id',
+    in: 'path',
+    required: true,
+    schema: new OA\Schema(type: 'string', pattern: '^[0-9A-HJKMNP-TV-Z]{26}$'),
+)]
+~~~
+
+Static routes are matched before dynamic routes, so `/users/search` is preferred over `/users/{id}` regardless of reflection order.
+
 Parameters are automatically injected into the method.
 
 ---

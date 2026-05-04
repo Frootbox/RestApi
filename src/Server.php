@@ -84,20 +84,8 @@ class Server
 
                     // Extract route
                     $route = $attribute->getArguments()['path'];
-
-                    // Generate regex
-                    $regex = $route;
-                    $regex = '#^' . preg_replace_callback('#{int:(.*?)}#', function($data) {
-                        return '(?P<' . $data[1] . '>[0-9]+)';
-                    }, $regex, -1, $count) . '$#i';
-
-                    if ($count == 0) {
-
-                        $regex = $route;
-                        $regex = '#^' . preg_replace_callback('#{(.*?)}#', function($data) {
-                            return '(?P<' . $data[1] . '>[^\/]+)';
-                        }, $regex) . '$#i';
-                    }
+                    $parameterPatterns = $this->getParameterPatterns($attributes);
+                    $compiledRoute = $this->compileRoute($route, $parameterPatterns);
 
                     // Extract http-method
                     $httpMethod = str_replace('OpenApi\\Attributes\\', '', $attribute->getName());
@@ -105,7 +93,8 @@ class Server
                     // Add route to stack
                     $routes[$httpMethod][] = [
                         'route' => $route,
-                        'regex' => $regex,
+                        'regex' => $compiledRoute['regex'],
+                        'priority' => $compiledRoute['priority'],
                         'version' => $version,
                         'httpMethod' => $httpMethod,
                         'method' => $method->getName(),
@@ -116,7 +105,122 @@ class Server
             }
         }
 
+        foreach ($routes as &$methodRoutes) {
+            usort($methodRoutes, static function (array $left, array $right): int {
+                return $right['priority'] <=> $left['priority'];
+            });
+        }
+        unset($methodRoutes);
+
         $this->routes = $routes;
+    }
+
+    /**
+     * @param \ReflectionAttribute[] $attributes
+     * @return array<string, string>
+     */
+    protected function getParameterPatterns(array $attributes): array
+    {
+        $patterns = [];
+
+        foreach ($attributes as $attribute) {
+
+            if ($attribute->getName() != 'OpenApi\Attributes\Parameter') {
+                continue;
+            }
+
+            $arguments = $attribute->getArguments();
+
+            if (($arguments['in'] ?? null) != 'path' || empty($arguments['name'])) {
+                continue;
+            }
+
+            $pattern = $arguments['pattern'] ?? null;
+
+            if (empty($pattern) && !empty($arguments['schema']) && is_object($arguments['schema'])) {
+                $pattern = $arguments['schema']->pattern ?? null;
+            }
+
+            if (is_string($pattern) && $pattern !== '') {
+                $patterns[$arguments['name']] = $this->normalizeRoutePattern($pattern);
+            }
+        }
+
+        return $patterns;
+    }
+
+    /**
+     * @return array{regex: string, priority: int}
+     */
+    protected function compileRoute(string $route, array $parameterPatterns): array
+    {
+        $priority = 0;
+        $parameterCount = 0;
+        $offset = 0;
+        $regex = '';
+
+        preg_match_all('#{(?:(int|ulid):)?([A-Za-z_][A-Za-z0-9_]*)}#', $route, $matches, \PREG_SET_ORDER | \PREG_OFFSET_CAPTURE);
+
+        foreach ($matches as $match) {
+            $placeholder = $match[0][0];
+            $placeholderOffset = $match[0][1];
+            $type = $match[1][0] ?: null;
+            $name = $match[2][0];
+
+            $regex .= preg_quote(substr($route, $offset, $placeholderOffset - $offset), '#');
+
+            $pattern = $parameterPatterns[$name] ?? null;
+
+            if ($pattern === null) {
+                $pattern = match ($type) {
+                    'int' => '[0-9]+',
+                    'ulid' => '[0-9A-HJKMNP-TV-Z]{26}',
+                    default => '[^\/]+',
+                };
+            }
+
+            if ($pattern === '[^\/]+') {
+                $priority += 1;
+            }
+            else {
+                $priority += 10;
+            }
+
+            $regex .= '(?P<' . $name . '>' . $pattern . ')';
+            $offset = $placeholderOffset + strlen($placeholder);
+            ++$parameterCount;
+        }
+
+        $regex .= preg_quote(substr($route, $offset), '#');
+
+        $staticSegmentCount = 0;
+
+        foreach (explode('/', trim($route, '/')) as $segment) {
+
+            if ($segment !== '' && !preg_match('#^{.*}$#', $segment)) {
+                ++$staticSegmentCount;
+            }
+        }
+
+        $priority += ($staticSegmentCount * 100) - $parameterCount;
+
+        return [
+            'regex' => '#^' . $regex . '$#i',
+            'priority' => $priority,
+        ];
+    }
+
+    protected function normalizeRoutePattern(string $pattern): string
+    {
+        if (str_starts_with($pattern, '^')) {
+            $pattern = substr($pattern, 1);
+        }
+
+        if (str_ends_with($pattern, '$')) {
+            $pattern = substr($pattern, 0, -1);
+        }
+
+        return $pattern;
     }
 
     /**
