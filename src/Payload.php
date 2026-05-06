@@ -49,11 +49,32 @@ class Payload
 
     /**
      * @param string $parameter
-     * @return int|string|null
+     * @return int|float|string|bool|null
      */
-    public function getQueryParameter(string $parameter): int|float|string|null
+    public function getQueryParameter(string $parameter): int|float|string|bool|null
     {
-        return $this->queryParameters[$parameter] ?? null;
+        if (!isset($this->queryParameters[$parameter])) {
+            return null;
+        }
+
+        $value = $this->queryParameters[$parameter];
+
+        if ($value === 'true') {
+            return true;
+        }
+
+        if ($value === 'false') {
+            return false;
+        }
+
+        if (is_numeric($value)) {
+            if (str_contains($value, '.')) {
+                return (float)$value;
+            }
+            return (int)$value;
+        }
+
+        return $value;
     }
 
     /**
