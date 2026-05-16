@@ -414,15 +414,44 @@ class Server
         }
         catch (\Frootbox\RestApi\Exception\AbstractException $exception) {
 
-            http_response_code($exception->getHttpStatusCode());
+            $this->respondWithError(
+                statusCode: $exception->getHttpStatusCode(),
+                message: $exception->getMessage() ?: 'Unknown Error: ' . get_class($exception),
+            );
+        }
+        catch (\Frootbox\Exceptions\Interfaces\HttpException $exception) {
 
-            die(!empty($exception->getMessage()) ? $exception->getMessage() : 'Unknown Error: ' . get_class($exception));
+            $this->respondWithError(
+                statusCode: $exception->getHttpStatusCode(),
+                message: $exception->hasPublicMessage() ? $exception->getMessage() : null,
+                code: $exception->getErrorCode(),
+            );
         }
         catch (\Throwable $exception) {
 
-            http_response_code(500);
-            
-            die(!empty($exception->getMessage()) ? $exception->getMessage() : 'Unknown Error: ' . get_class($exception));
+            $this->respondWithError(
+                statusCode: 500,
+                message: $exception->getMessage() ?: 'Unknown Error: ' . get_class($exception),
+            );
         }
+    }
+
+    /**
+     * @param int $statusCode
+     * @param string|null $message
+     * @param string|null $code
+     * @return never
+     */
+    protected function respondWithError(int $statusCode, ?string $message, ?string $code = null): never
+    {
+        http_response_code($statusCode);
+        header('Content-Type: application/json; charset=utf-8');
+
+        die(json_encode([
+            'error' => [
+                'code' => $code ?: 'error',
+                'message' => $message ?: 'Unexpected API error.',
+            ],
+        ]));
     }
 }
