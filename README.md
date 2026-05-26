@@ -18,7 +18,8 @@ This package provides a simple way to build versioned REST APIs with support for
 - Dependency Injection support (PHP-DI)
 - Automatic route discovery
 - Named route parameters (`{id}`, `{int:id}`)
-- JSON response handling
+- JSON and `application/x-www-form-urlencoded` request body parsing
+- JSON response handling with optional response headers/status codes
 
 ---
 
@@ -130,13 +131,39 @@ Authorization: Basic base64(clientId:clientSecret)
 
 ---
 
-#### Client Credentials (GET or Basic)
+#### Client Credentials (Basic, form body, or legacy query)
 
 ~~~markdown
-GET /endpoint?client_id=xxx&client_secret=yyy
+Authorization: Basic base64(clientId:clientSecret)
 ~~~
 
-or via Basic Auth.
+For OAuth-compatible token endpoints, client credentials can also be sent in an
+`application/x-www-form-urlencoded` request body as `client_id` and
+`client_secret`. Query string credentials are still supported as a legacy
+fallback and can be disabled through the `Server` constructor:
+
+~~~php
+$server = new Server(
+    // ...
+    allowClientCredentialsInQuery: false
+);
+~~~
+
+---
+
+## Request Payloads
+
+`Frootbox\RestApi\Payload` supports JSON request bodies and
+`application/x-www-form-urlencoded` request bodies. Existing JSON endpoints keep
+working as before, while OAuth token endpoints can follow the OAuth standard:
+
+~~~http
+POST /oauth/token
+Authorization: Basic base64(clientId:clientSecret)
+Content-Type: application/x-www-form-urlencoded
+
+grant_type=refresh_token&refresh_token=...
+~~~
 
 ---
 

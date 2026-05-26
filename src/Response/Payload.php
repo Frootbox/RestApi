@@ -17,8 +17,27 @@ class Payload implements ResponseInterface
      */
     public function __construct(
         protected array $payload = [],
+        protected int $statusCode = 200,
+        protected array $headers = [],
     )
     { }
+
+    public function addHeader(string $name, string $value): static
+    {
+        $this->headers[$name] = $value;
+
+        return $this;
+    }
+
+    public function getHeaders(): array
+    {
+        return $this->headers;
+    }
+
+    public function getStatusCode(): int
+    {
+        return $this->statusCode;
+    }
 
     /**
      * @param array $payload
@@ -27,6 +46,11 @@ class Payload implements ResponseInterface
     public function setPayload(array $payload): void
     {
         $this->payload = $payload;
+    }
+
+    public function setStatusCode(int $statusCode): void
+    {
+        $this->statusCode = $statusCode;
     }
 
     /**

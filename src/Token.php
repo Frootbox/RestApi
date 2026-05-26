@@ -18,12 +18,13 @@ class Token
     )
     { }
 
-    /**
-     * @param string $key
-     * @return string|null
-     */
-    public function getPayload(string $key): ?string
+    public function getPayload(string $key): mixed
     {
         return $this->payload[$key] ?? null;
+    }
+
+    public function getPayloads(): array
+    {
+        return $this->payload;
     }
 }

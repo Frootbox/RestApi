@@ -13,6 +13,7 @@ namespace Frootbox\RestApi;
 class Server
 {
     protected array $routes = [];
+    protected array $activeAuths = [];
 
     public function __construct(
         protected Interface\ClientRepositoryInterface $clientRepository,
@@ -23,6 +24,7 @@ class Server
         protected string $hashKey,
         protected $onDecodeToken = null,
         protected $onValidateClient = null,
+        protected bool $allowClientCredentialsInQuery = true,
     )
     {
         $routes = [
@@ -269,12 +271,14 @@ class Server
             }
 
             if (empty($route)) {
-                throw new \Exception('Route does not exist');
+                throw new \Exception('Route ' . $requestedPath . ' does not exist');
             }
 
             if (empty($route['auths'])) {
                 throw new \Exception('Auth method missing.');
             }
+
+            $this->activeAuths = $route['auths'];
 
             $authed = false;
             $authError = null;
@@ -307,7 +311,7 @@ class Server
                     }
                     elseif ($auth == \Frootbox\RestApi\Attribute\Bearer::class) {
 
-                        if (empty($_SERVER['HTTP_AUTHORIZATION']) or !str_starts_with($_SERVER['HTTP_AUTHORIZATION'], 'Bearer ')) {
+                        if (empty($_SERVER['HTTP_AUTHORIZATION']) or stripos($_SERVER['HTTP_AUTHORIZATION'], 'Bearer ') !== 0) {
                             continue;
                         }
 
@@ -327,24 +331,7 @@ class Server
                     }
                     elseif ($auth == \Frootbox\RestApi\Attribute\Client::class) {
 
-                        $clientId = null;
-                        $clientSecret = null;
-
-                        if (!empty($_SERVER['PHP_AUTH_USER'])) {
-                            $clientId = $_SERVER['PHP_AUTH_USER'];
-                        }
-
-                        if (!empty($_SERVER['PHP_AUTH_PW'])) {
-                            $clientSecret = $_SERVER['PHP_AUTH_PW'];
-                        }
-
-                        if (!empty($_GET['client_id'])) {
-                            $clientId = $_GET['client_id'];
-                        }
-
-                        if (!empty($_GET['client_secret'])) {
-                            $clientSecret = $_GET['client_secret'];
-                        }
+                        [ $clientId, $clientSecret ] = $this->getClientCredentials();
 
                         if (empty($clientSecret) && empty($clientId)) {
                             continue;
@@ -409,6 +396,8 @@ class Server
             // Perform controller action
             $response = $this->container->call([ $controller, $route['method'] ]);
 
+            $this->sendResponseHeaders($response);
+
             header('Content-Type: application/json; charset=utf-8');
             die($response->tojson());
         }
@@ -447,11 +436,99 @@ class Server
         http_response_code($statusCode);
         header('Content-Type: application/json; charset=utf-8');
 
+        if ($statusCode === 401) {
+            $this->sendAuthenticateHeader();
+        }
+
         die(json_encode([
             'error' => [
                 'code' => $code ?: 'error',
                 'message' => $message ?: 'Unexpected API error.',
             ],
         ]));
+    }
+
+    protected function sendAuthenticateHeader(): void
+    {
+        if (in_array(\Frootbox\RestApi\Attribute\Bearer::class, $this->activeAuths, true)) {
+            header('WWW-Authenticate: Bearer error="invalid_token"', false);
+
+            return;
+        }
+
+        if (
+            in_array(\Frootbox\RestApi\Attribute\Client::class, $this->activeAuths, true)
+            || in_array(\Frootbox\RestApi\Attribute\BasicAuth::class, $this->activeAuths, true)
+        ) {
+            header('WWW-Authenticate: Basic realm="api"', false);
+        }
+    }
+
+    protected function getClientCredentials(): array
+    {
+        $clientId = null;
+        $clientSecret = null;
+
+        if (!empty($_SERVER['PHP_AUTH_USER'])) {
+            $clientId = $_SERVER['PHP_AUTH_USER'];
+        }
+
+        if (!empty($_SERVER['PHP_AUTH_PW'])) {
+            $clientSecret = $_SERVER['PHP_AUTH_PW'];
+        }
+
+        if (empty($clientId) && empty($clientSecret)) {
+            $authorization = $_SERVER['HTTP_AUTHORIZATION'] ?? '';
+
+            if (stripos($authorization, 'Basic ') === 0) {
+                $decoded = base64_decode(substr($authorization, 6), true);
+
+                if ($decoded !== false && str_contains($decoded, ':')) {
+                    [ $clientId, $clientSecret ] = explode(':', $decoded, 2);
+                }
+            }
+        }
+
+        if (empty($clientId) && empty($clientSecret)) {
+            try {
+                $payload = new Payload();
+
+                $clientId = $payload->getBodyParameter('client_id');
+                $clientSecret = $payload->getBodyParameter('client_secret');
+            }
+            catch (\Frootbox\RestApi\Exception\InvalidInput) {
+                // Keep client authentication backwards compatible for endpoints that do not use parsed bodies.
+            }
+        }
+
+        if ($this->allowClientCredentialsInQuery) {
+            if (empty($clientId) && !empty($_GET['client_id'])) {
+                $clientId = $_GET['client_id'];
+            }
+
+            if (empty($clientSecret) && !empty($_GET['client_secret'])) {
+                $clientSecret = $_GET['client_secret'];
+            }
+        }
+
+        return [
+            $clientId !== null ? (string) $clientId : null,
+            $clientSecret !== null ? (string) $clientSecret : null,
+        ];
+    }
+
+    protected function sendResponseHeaders(\Frootbox\RestApi\Response\ResponseInterface $response): void
+    {
+        if (method_exists($response, 'getStatusCode')) {
+            http_response_code($response->getStatusCode());
+        }
+
+        if (!method_exists($response, 'getHeaders')) {
+            return;
+        }
+
+        foreach ($response->getHeaders() as $name => $value) {
+            header($name . ': ' . $value);
+        }
     }
 }

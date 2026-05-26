@@ -14,15 +14,39 @@ class Payload
 {
     protected array $queryParameters = [];
     protected array $bodyParameters = [];
+    protected ?string $contentType = null;
+    protected string $rawBody = '';
 
-    public function __construct()
+    public function __construct(
+        ?array $queryParameters = null,
+        ?array $bodyParameters = null,
+        ?string $rawBody = null,
+        ?string $contentType = null,
+    )
     {
-        $this->queryParameters = $_GET;
+        $this->queryParameters = $queryParameters ?? $_GET;
+        $this->contentType = $contentType ?? ($_SERVER['CONTENT_TYPE'] ?? $_SERVER['HTTP_CONTENT_TYPE'] ?? null);
+
+        if ($bodyParameters !== null) {
+            $this->bodyParameters = $bodyParameters;
+            $this->rawBody = $rawBody ?? '';
+
+            return;
+        }
 
         // Parse request body
-        $requestBody = trim(file_get_contents('php://input'));
+        $this->rawBody = $rawBody ?? (string) file_get_contents('php://input');
+        $requestBody = trim($this->rawBody);
 
-        if (!empty($requestBody)) {
+        if ($requestBody === '') {
+            if (!empty($_POST)) {
+                $this->bodyParameters = $_POST;
+            }
+
+            return;
+        }
+
+        if ($this->isJsonRequest()) {
 
             // Validate json
             if (!\json_validate($requestBody)) {
@@ -35,7 +59,24 @@ class Payload
             if (!empty($requestBody)) {
                 $this->bodyParameters = $requestBody;
             }
+
+            return;
         }
+
+        if ($this->isFormUrlencodedRequest()) {
+            parse_str($requestBody, $bodyParameters);
+            $this->bodyParameters = $bodyParameters;
+
+            return;
+        }
+
+        if (\json_validate($requestBody)) {
+            $this->bodyParameters = json_decode($requestBody, true) ?: [];
+
+            return;
+        }
+
+        throw new \Frootbox\RestApi\Exception\InvalidInput("Unsupported request content type.");
     }
 
     /**
@@ -45,6 +86,16 @@ class Payload
     public function getBodyParameter(string $parameter): int|float|string|array|bool|null
     {
         return $this->bodyParameters[$parameter] ?? null;
+    }
+
+    public function getBodyParameters(): array
+    {
+        return $this->bodyParameters;
+    }
+
+    public function getContentType(): ?string
+    {
+        return $this->contentType;
     }
 
     /**
@@ -77,6 +128,16 @@ class Payload
         return $value;
     }
 
+    public function getQueryParameters(): array
+    {
+        return $this->queryParameters;
+    }
+
+    public function getRawBody(): string
+    {
+        return $this->rawBody;
+    }
+
     /**
      * @param string $parameter
      * @return bool
@@ -93,5 +154,20 @@ class Payload
     public function hasQueryParameter(string $parameter): bool
     {
         return isset($this->queryParameters[$parameter]);
+    }
+
+    protected function isFormUrlencodedRequest(): bool
+    {
+        return str_starts_with(strtolower((string) $this->contentType), 'application/x-www-form-urlencoded');
+    }
+
+    protected function isJsonRequest(): bool
+    {
+        $contentType = strtolower((string) $this->contentType);
+        $mediaType = strtok($contentType, ';') ?: '';
+
+        return $contentType === ''
+            || str_starts_with($contentType, 'application/json')
+            || str_ends_with($mediaType, '+json');
     }
 }
