@@ -139,11 +139,16 @@ class Server
 
             $pattern = $arguments['pattern'] ?? null;
 
-            if (empty($pattern) && !empty($arguments['schema']) && is_object($arguments['schema'])) {
+            if (
+                (empty($pattern) || \OpenApi\Generator::isDefault($pattern))
+                && !empty($arguments['schema'])
+                && is_object($arguments['schema'])
+                && !\OpenApi\Generator::isDefault($arguments['schema'])
+            ) {
                 $pattern = $arguments['schema']->pattern ?? null;
             }
 
-            if (is_string($pattern) && $pattern !== '') {
+            if (is_string($pattern) && $pattern !== '' && !\OpenApi\Generator::isDefault($pattern)) {
                 $patterns[$arguments['name']] = $this->normalizeRoutePattern($pattern);
             }
         }
