@@ -78,6 +78,8 @@ class Server
                     $auths[] = \Frootbox\RestApi\Attribute\Bearer::class;
                 }
 
+                $apiScopes = $this->getApiScopes($attributes);
+
                 foreach ($attributes as $attribute) {
 
                     if (empty($attribute->getArguments()['path'])) {
@@ -102,6 +104,7 @@ class Server
                         'method' => $method->getName(),
                         'class' => $controllerClass,
                         'auths' => $auths,
+                        'apiScopes' => $apiScopes,
                     ];
                 }
             }
@@ -115,6 +118,36 @@ class Server
         unset($methodRoutes);
 
         $this->routes = $routes;
+    }
+
+    /**
+     * @param \ReflectionAttribute[] $attributes
+     * @return array<int, string>
+     */
+    protected function getApiScopes(array $attributes): array
+    {
+        $scopes = [];
+
+        foreach ($attributes as $attribute) {
+
+            if ($attribute->getName() != 'Frootbox\RestApi\Attribute\ApiScope') {
+                continue;
+            }
+
+            $arguments = $attribute->getArguments();
+
+            foreach ($arguments as $argument) {
+
+                if (is_array($argument)) {
+                    $scopes = array_merge($scopes, $argument);
+                    continue;
+                }
+
+                $scopes[] = $argument;
+            }
+        }
+
+        return array_values(array_unique(array_filter($scopes)));
     }
 
     /**
@@ -287,6 +320,7 @@ class Server
 
             $authed = false;
             $authError = null;
+            $token = null;
 
             foreach ($route['auths'] as $auth) {
 
@@ -395,6 +429,8 @@ class Server
                 throw new \Frootbox\RestApi\Exception\NotAuthed($authError ?? 'Not authed.');
             }
 
+            $this->assertApiScopesAllowed($token, $route['apiScopes'] ?? []);
+
             // Get controller
             $controller = $this->container->get($route['class']);
 
@@ -428,6 +464,35 @@ class Server
                 message: $exception->getMessage() ?: 'Unknown Error: ' . get_class($exception),
             );
         }
+    }
+
+    protected function assertApiScopesAllowed(?\Frootbox\RestApi\Token $token, array $requiredScopes): void
+    {
+        if (empty($requiredScopes)) {
+            return;
+        }
+
+        if ($token === null) {
+            throw new \Frootbox\RestApi\Exception\Forbidden('Token does not provide the required scope.');
+        }
+
+        $tokenScopes = $token->getPayload('scope') ?? [];
+
+        if (is_string($tokenScopes)) {
+            $tokenScopes = preg_split('/\s+/', trim($tokenScopes));
+        }
+
+        if (!is_array($tokenScopes)) {
+            $tokenScopes = [];
+        }
+
+        $tokenScopes = array_values(array_filter(array_unique($tokenScopes)));
+
+        if (empty(array_diff($requiredScopes, $tokenScopes))) {
+            return;
+        }
+
+        throw new \Frootbox\RestApi\Exception\Forbidden('Token does not provide the required scope.');
     }
 
     /**
