@@ -12,7 +12,7 @@ namespace Frootbox\RestApi\Attribute;
 class Auth
 {
     public function __construct(
-        Client|Bearer|BasicAuth|ApiKey|None $type,
+        Client|PublicClient|Bearer|BasicAuth|ApiKey|None $type,
     )
     { }    
 }

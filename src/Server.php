@@ -16,7 +16,7 @@ class Server
     protected array $activeAuths = [];
 
     public function __construct(
-        protected Interface\ClientRepositoryInterface $clientRepository,
+        protected Interface\ClientRepositoryInterface|Interface\PublicClientRepositoryInterface|null $clientRepository,
         protected string $baseUriRegex,
         protected string $controllerDirectory,
         protected string $namespace,
@@ -337,7 +337,7 @@ class Server
                         }
 
                         // Validate client
-                        $this->clientRepository->validate(
+                        $this->getClientRepository()->validate(
                             clientId: $_SERVER['PHP_AUTH_USER'],
                             clientSecret: $_SERVER['PHP_AUTH_PW'],
                         );
@@ -368,6 +368,21 @@ class Server
                     elseif ($auth == \Frootbox\RestApi\Attribute\None::class) {
                         $authed = true;
                     }
+                    elseif ($auth == \Frootbox\RestApi\Attribute\PublicClient::class) {
+
+                        $clientId = $this->getPublicClientId();
+
+                        if (empty($clientId)) {
+                            continue;
+                        }
+
+                        $this->getPublicClientRepository()->validatePublicClient(
+                            clientId: $clientId,
+                            onValidateClient: $this->onValidateClient,
+                        );
+
+                        $authed = true;
+                    }
                     elseif ($auth == \Frootbox\RestApi\Attribute\Client::class) {
 
                         [ $clientId, $clientSecret ] = $this->getClientCredentials();
@@ -385,7 +400,7 @@ class Server
                         }
 
                         // Validate client
-                        $this->clientRepository->validate(
+                        $this->getClientRepository()->validate(
                             clientId: $clientId,
                             clientSecret: $clientSecret,
                             onValidateClient: $this->onValidateClient,
@@ -407,7 +422,7 @@ class Server
                         }
 
                         // Validate api key
-                        $this->clientRepository->validateApiKey(
+                        $this->getClientRepository()->validateApiKey(
                             apiKey: $apiKey,
                             onValidateClient: $this->onValidateClient,
                         );
@@ -532,6 +547,42 @@ class Server
         ) {
             header('WWW-Authenticate: Basic realm="api"', false);
         }
+    }
+
+    protected function getClientRepository(): \Frootbox\RestApi\Interface\ClientRepositoryInterface
+    {
+        if (!$this->clientRepository instanceof \Frootbox\RestApi\Interface\ClientRepositoryInterface) {
+            throw new \LogicException('This authentication method requires a ClientRepositoryInterface.');
+        }
+
+        return $this->clientRepository;
+    }
+
+    protected function getPublicClientRepository(): \Frootbox\RestApi\Interface\PublicClientRepositoryInterface
+    {
+        if (!$this->clientRepository instanceof \Frootbox\RestApi\Interface\PublicClientRepositoryInterface) {
+            throw new \LogicException('Public client authentication requires a PublicClientRepositoryInterface.');
+        }
+
+        return $this->clientRepository;
+    }
+
+    protected function getPublicClientId(): ?string
+    {
+        $clientId = null;
+
+        try {
+            $clientId = (new Payload())->getBodyParameter('client_id');
+        }
+        catch (\Frootbox\RestApi\Exception\InvalidInput) {
+            // The endpoint may not use a parsed request body.
+        }
+
+        if ($this->allowClientCredentialsInQuery && empty($clientId) && !empty($_GET['client_id'])) {
+            $clientId = $_GET['client_id'];
+        }
+
+        return $clientId !== null ? (string) $clientId : null;
     }
 
     protected function getClientCredentials(): array

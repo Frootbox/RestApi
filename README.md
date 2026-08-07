@@ -42,7 +42,7 @@ use DI\\Container;
 $container = new Container();
 
 $server = new Server(
-    clientRepository: $clientRepository, // implements ClientRepositoryInterface
+    clientRepository: $clientRepository, // or null when no client authentication is used
     baseUriRegex: '#^/api/v(?P<Version>[0-9]+)(?P<Path>/.*)$#',
     controllerDirectory: __DIR__ . '/Controller',
     namespace: 'App\\\\Controller',
@@ -104,6 +104,19 @@ You can define one or multiple authentication methods per endpoint:
 ~~~
 
 ### Supported Auth Methods
+
+#### Public Client
+
+Use this for browser and native applications which can identify themselves but
+cannot keep a client secret confidential:
+
+~~~php
+#[Auth(type: new PublicClient())]
+~~~
+
+Send the public identifier as `client_id` in the request body. Legacy query
+string transport follows the `allowClientCredentialsInQuery` setting. Public
+clients never send a `client_secret`.
 
 #### API Key
 
@@ -169,7 +182,7 @@ grant_type=refresh_token&refresh_token=...
 
 ## 🧠 Client Validation
 
-You must provide a repository implementing:
+For confidential client credentials and API keys, provide a repository implementing:
 
 ~~~markdown
 Frootbox\\RestApi\\Interface\\ClientRepositoryInterface
@@ -195,6 +208,31 @@ class ClientRepository implements ClientRepositoryInterface
     }
 }
 ~~~
+
+Public clients use the opt-in interface below. This keeps existing client
+repository implementations backwards compatible:
+
+~~~php
+class ClientRepository implements PublicClientRepositoryInterface
+{
+    public function validatePublicClient(string $clientId, ?callable $onValidateClient = null): void
+    {
+        $client = $this->findActivePublicClient($clientId);
+
+        if ($client === null) {
+            throw new \Exception('Invalid public client');
+        }
+
+        if ($onValidateClient !== null) {
+            $onValidateClient($client);
+        }
+    }
+}
+~~~
+
+When an API only uses `Bearer` and `None`, pass `clientRepository: null`. The
+repository is only required when a route declares `Client`, `BasicAuth`,
+`ApiKey`, or `PublicClient` authentication.
 
 ---
 
