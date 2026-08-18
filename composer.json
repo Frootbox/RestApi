@@ -15,7 +15,7 @@
     "require": {
         "php": ">=8.3",
         "zircote/swagger-php": "^4.10",
-        "php-di/php-di": "^6.3",
+        "php-di/php-di": "^6.3 || ^7.0",
         "firebase/php-jwt": "^7",
         "frootbox/exceptions": "^0.1"
     },
